@@ -34,30 +34,59 @@ for i in range(13):
 
 #TITULO
 st.write("""
-# Taxa de cobertura de 2010 a 2023
+# Dados da ANS (Taxa de cobertura)
 """)
 
-#PLOT
+#PLOT E TABELA
 estados = st.multiselect(
         "Escolha o estado", list(grouped_dfs[0].index), ["RN"]
     )
+
 if not estados:
     st.error("Selecione pelo menos um estado.")
 else:
     data = grouped_dfs[0].loc[estados]
-    st.write("Taxa de cobertura (%)", data.sort_index())
-
+    data1 = data
     data = data.T.reset_index()
     data = pd.melt(data, id_vars=["index"]).rename(
-            columns={"index": "ano", "value": "Taxa de cobertura (%)"}
+            columns={"index": "ano", "value": "taxa"}
         )
+
+    hover = alt.selection_point(
+        fields=["ano"],
+        nearest=True,
+        on="mouseover",
+        empty=False,
+    )
+
     chart = (
-        alt.Chart(data)
-        .mark_area(opacity=0.3)
+        alt.Chart(data, title="Taxa de cobertura de 2010 a 2023")
+        .mark_line()
         .encode(
-            x="ano:T",
-            y=alt.Y("Taxa de cobertura (%):Q", stack=None),
-            color="SG_UF:N",
+            x=alt.X("ano:T", title="Ano"),
+            y=alt.Y("taxa:Q", stack=None, title="Taxa de cobertura (%)"),
+            color=alt.Color("SG_UF:N", title="Estado"),
         )
     )
-    st.altair_chart(chart, use_container_width=True)
+
+    points = chart.transform_filter(hover).mark_circle(size=65)
+
+    tooltips = (
+        alt.Chart(data)
+        .mark_rule()
+        .encode(
+            x="ano:T",
+            y="taxa:Q",
+            opacity=alt.condition(hover, alt.value(0.3), alt.value(0)),
+            tooltip=[
+                alt.Tooltip("year(ano)" , title="Ano"),
+                alt.Tooltip("taxa", title="Taxa de cobertura (%)"),
+                alt.Tooltip("SG_UF:N", title="Estado"),
+            ],
+        )
+        .add_params(hover)
+    )
+
+    st.altair_chart((chart + points + tooltips).interactive(), use_container_width=True)
+    data1 = data1.rename_axis('Estado')
+    st.write(data1.sort_index())
